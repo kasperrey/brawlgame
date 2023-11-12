@@ -29,16 +29,19 @@ class Server:
             time.sleep(0.02)
         c.recv(1024)
         c.send(json.dumps([{"position": [240, 100], "foto": "self.images.stilstaan_img"}]).encode())
-        while True:
-            andere_data = []
-            self.data[addr] = json.loads(c.recv(1024).decode())
-            self.lock.acquire()
-            for data in self.data.keys():
-                if data != addr:
-                    andere_data.append(self.data[data])
-            for data in andere_data:
-                del self.data[list(self.data.keys())[list(self.data.values()).index(data)]]
-            self.lock.release()
-            c.send(json.dumps(andere_data).encode())
+        try:
+            while True:
+                andere_data = []
+                self.data[addr] = json.loads(c.recv(1024).decode())
+                self.lock.acquire()
+                for data in self.data.keys():
+                    if data != addr:
+                        andere_data.append(self.data[data])
+                for data in andere_data:
+                    del self.data[list(self.data.keys())[list(self.data.values()).index(data)]]
+                self.lock.release()
+                c.send(json.dumps(andere_data).encode())
+        except json.decoder.JSONDecodeError as e:
+            self.start -= 1
 
 Server()

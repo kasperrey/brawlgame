@@ -1,13 +1,7 @@
 import json
 import socket
-from time import sleep
 from tkinter import NW, Tk, Canvas, PhotoImage
 from collision.collision import Rect
-
-
-class Data:
-    def __init__(self, position):
-        self.position = position
 
 
 class Afbeeldingen:
@@ -20,7 +14,6 @@ class Afbeeldingen:
         self.block2 = PhotoImage(file="doos2.png")
 
 
-
 class Socketconnector:
     def __init__(self, man):
         self.s = socket.socket()
@@ -29,10 +22,11 @@ class Socketconnector:
         self.man = man
 
     def kijk(self):
-        self.s.send(json.dumps({"position": (self.man.x, self.man.geheel_y-15),
+        self.s.send(json.dumps({"position": (self.man.x, self.man.geheel_y),
                                 "foto": self.man.image_string}, indent=4).encode())
         data = self.s.recv(1024).decode()
         self.man.andere_spelers = json.loads(data)
+
 
 class Man:
     def __init__(self, tk, canvas):
@@ -50,6 +44,8 @@ class Man:
         self.canvas = canvas
         self.x = 240
         self.y = 115
+        self.verander_x = 0
+        self.verander_y = 0
         self.geheel_y = 115
         self.imy = -125
         self.achtergrond_img = self.canvas.create_image(0, 0, anchor=NW, image=self.images.img)
@@ -61,12 +57,16 @@ class Man:
         self.s.kijk()
         self.move_andere_personen()
         self.lees_in2()
-        self.canvas.bind_all('<KeyPress-Left>', lambda ev: self.move(-5, 0))
-        self.canvas.bind_all('<KeyPress-Right>', lambda ev: self.move(5, 0))
-        self.canvas.bind_all('<KeyPress-Up>', lambda ev: self.move(0, -5))
-        self.canvas.bind_all('<KeyPress-Down>', lambda ev: self.move(0, 5))
+        self.canvas.bind_all('<KeyPress-Left>', lambda ev: self.verander_verander_x(-3))
+        self.canvas.bind_all('<KeyRelease-Left>', lambda ev: self.verander_verander_x(0))
+        self.canvas.bind_all('<KeyPress-Right>', lambda ev: self.verander_verander_x(3))
+        self.canvas.bind_all('<KeyRelease-Right>', lambda ev: self.verander_verander_x(0))
+        self.canvas.bind_all('<KeyPress-Up>', lambda ev: self.verander_verander_y(-3))
+        self.canvas.bind_all('<KeyRelease-Up>', lambda ev: self.verander_verander_y(0))
+        self.canvas.bind_all('<KeyPress-Down>', lambda ev: self.verander_verander_y(3))
+        self.canvas.bind_all('<KeyRelease-Down>', lambda ev: self.verander_verander_y(0))
 
-    def move(self, x, y):
+    def move(self):
         recten = []
         waters_pos = []
         for vierkant in  self.doosjes1:
@@ -75,82 +75,89 @@ class Man:
             recten.append(plek)
         for water in  self.waters:
             waters_pos.append(self.canvas.coords(water))
-        if x:
-            self.x += x
-            man = (self.x + 5, self.y + 5, self.x + 19, self.y + 15)
-            for rect in recten:
-                if Rect.rect_and_rect(man[0], man[1], man[2], man[3], rect[0], rect[1], rect[2], rect[3]):
-                    self.x -= x
-                    self.canvas.moveto(self.man_img, self.x, self.y-15)
-                    return
-            for water in waters_pos:
-                if Rect.rect_and_rect(man[0], man[1], man[2], man[3], water[0], water[1], water[2], water[3]):
-                    self.x -= x
-                    self.canvas.moveto(self.man_img, self.x, self.y-15)
-                    return
-            self.x -= x
-            self.x += x
-            if 480 > self.x > 0:
-                self.canvas.move(self.man_img, x, y)
-            else:
-                self.x -= x
-                self.y -= y
-            if x > 0:
+        if self.verander_x and self.verander_y:
+            self.x += self.verander_x
+            self.y += self.verander_y
+            if self.botsen(self.verander_x, self.verander_y, recten, waters_pos):
+                return
+            self.y -= self.verander_y
+            if not self.bots_achtergrond(self.verander_y):
+                self.y += self.verander_y
+                self.geheel_y += self.verander_y
+                if self.y < 0 and self.verander_y < 0:
+                    self.y -= self.verander_y
+                    self.geheel_y -= self.verander_y
+                elif self.y > 235 and self.verander_y > 0:
+                    self.y -= self.verander_y
+                    self.geheel_y -= self.verander_y
+            if not (485 > self.x > 0):
+                self.x -= self.verander_x
+            if self.verander_x > 0:
                 self.animate(self.images.looprechts)
             else:
                 self.animate(self.images.looplinks)
-        if y:
-            self.y += y
-            man = (self.x + 5, self.y + 5, self.x + 19, self.y + 15)
-            for rect in recten:
-                if Rect.rect_and_rect(man[0], man[1], man[2], man[3], rect[0], rect[1], rect[2], rect[3]):
-                    self.y -= y
-                    self.canvas.moveto(self.man_img, self.x, self.y-15)
-                    return
-            for water in waters_pos:
-                if Rect.rect_and_rect(man[0], man[1], man[2], man[3], water[0], water[1], water[2], water[3]):
-                    self.y -= y
-                    self.canvas.moveto(self.man_img, self.x, self.y-15)
-                    return
-            self.y -= y
-            if y > 0:
-                if 230 > self.y > 185 and self.imy > -250:
-                    self.imy -= y
-                    self.canvas.move(self.achtergrond_img, -x, -y)
-                    self.geheel_y += y
-                    for rect in self.doosjes1:
-                        self.canvas.move(rect, -x, -y)
-                    for rect in self.doosjes2:
-                        self.canvas.move(rect, -x, -y)
-                    for water in self.waters:
-                        self.canvas.move(water, -x, -y)
-                else:
-                    self.y += y
-                    self.geheel_y += y
-                    if 230 > self.y > 0:
-                        self.canvas.move(self.man_img, x, y)
-                    elif self.y > 230 and y > 0:
-                        self.y -= y
-                        self.geheel_y -= y
+        elif self.verander_x and (not self.verander_y):
+            self.x += self.verander_x
+            if self.botsen(self.verander_x, self.verander_y, recten, waters_pos):
+                return
+            if not (485 > self.x > 0):
+                self.x -= self.verander_x
+            if self.verander_x > 0:
+                self.animate(self.images.looprechts)
             else:
-                if 50 > self.y > 0 and -125 > self.imy:
-                    self.imy -= y
-                    self.geheel_y += y
-                    self.canvas.move(self.achtergrond_img, -x, -y)
-                    for rect in self.doosjes1:
-                        self.canvas.move(rect, -x, -y)
-                    for rect in self.doosjes2:
-                        self.canvas.move(rect, -x, -y)
-                    for water in self.waters:
-                        self.canvas.move(water, -x, -y)
-                else:
-                    self.y += y
-                    self.geheel_y += y
-                    if 230 > self.y > 0:
-                        self.canvas.move(self.man_img, x, y)
-                    elif self.y < 0 and y < 0:
-                        self.y -= y
-                        self.geheel_y -= y
+                self.animate(self.images.looplinks)
+        elif self.verander_y and (not self.verander_x):
+            self.y += self.verander_y
+            if self.botsen(self.verander_x, self.verander_y, recten, waters_pos):
+                return
+            self.y -= self.verander_y
+            if not self.bots_achtergrond(self.verander_y):
+                self.y += self.verander_y
+                self.geheel_y += self.verander_y
+                if self.y < 0 and self.verander_y < 0:
+                    self.y -= self.verander_y
+                    self.geheel_y -= self.verander_y
+                elif self.y > 235 and self.verander_y > 0:
+                    self.y -= self.verander_y
+                    self.geheel_y -= self.verander_y
+        self.canvas.moveto(self.man_img, self.x, self.y)
+
+    def botsen(self, x, y, recten, waters_pos):
+        man = (self.x + 5, self.y + 15, self.x + 19, self.y + 30)
+        for rect in recten:
+            if Rect.rect_and_rect(man[0], man[1], man[2], man[3], rect[0], rect[1], rect[2], rect[3]):
+                self.x -= x
+                self.y -= y
+                return True
+        for water in waters_pos:
+            if Rect.rect_and_rect(man[0], man[1], man[2], man[3], water[0], water[1], water[2], water[3]):
+                self.x -= x
+                self.y -= y
+                return True
+
+    def bots_achtergrond(self, y):
+        if 50 > self.y > 0 > y and -125 > self.imy:
+            self.imy -= y
+            self.canvas.move(self.achtergrond_img, 0, -y)
+            self.geheel_y += y
+            for rect in self.doosjes1:
+                self.canvas.move(rect, 0, -y)
+            for rect in self.doosjes2:
+                self.canvas.move(rect, 0, -y)
+            for water in self.waters:
+                self.canvas.move(water, 0, -y)
+        elif 235 > self.y > 185 and self.imy > -250 and y > 0:
+            self.imy -= y
+            self.canvas.move(self.achtergrond_img, 0, -y)
+            self.geheel_y += y
+            for rect in self.doosjes1:
+                self.canvas.move(rect, 0, -y)
+            for rect in self.doosjes2:
+                self.canvas.move(rect, 0, -y)
+            for water in self.waters:
+
+                self.canvas.move(water, 0, -y)
+            return True
 
     def animate(self, r):
         self.img_in_lijst += 1
@@ -206,6 +213,12 @@ class Man:
                     self.canvas.moveto(self.andere_spelers_images[persoon], self.andere_spelers[persoon]["position"][0],
                                                                             (self.andere_spelers[persoon]["position"][1]-self.geheel_y)+self.y)
 
+    def verander_verander_x(self, x):
+        self.verander_x = x
+
+    def verander_verander_y(self, y):
+        self.verander_y = y
+
 
 tk = Tk()
 canvas = Canvas(tk, width=500, height=250)
@@ -213,8 +226,15 @@ canvas.pack()
 bal = Man(tk, canvas)
 s = Socketconnector(bal)
 bal.socket(s)
-while True:
+
+
+def redraw():
     s.kijk()
     bal.move_andere_personen()
-    tk.update()
-    tk.update_idletasks()
+    bal.move()
+    tk.after(20, redraw)
+
+tk.after(20, redraw)
+
+tk.mainloop()
+
