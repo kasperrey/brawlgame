@@ -258,33 +258,26 @@ class Aanvallen:
         self.begin = begin
         self.aanval = canvas.create_oval(begin[0], begin[1], begin[0]+10, begin[1]+10, fill="blue")
 
-    def move(self, recten, waters):
+    def move(self, recten):
         self.keer += 1
         recten2 = []
-        waters_pos = []
         for vierkant in recten:
             coords = self.canvas.coords(vierkant)
             plek = [coords[0], coords[1], coords[0] + 20, coords[1] + 15]
             recten2.append(plek)
-        for water in waters:
-            waters_pos.append(self.canvas.coords(water))
         if int(math.sqrt(((self.richting_x * self.keer) ** 2)+((self.richting_y*self.keer) ** 2))) >= 100:
             self.canvas.delete(self.aanval)
             return False
-        if self.botsen(recten2, waters_pos):
+        if self.botsen(recten2):
             self.canvas.delete(self.aanval)
             return False
         self.canvas.move(self.aanval, self.richting_x, self.richting_y)
         return self.begin[0] + self.richting_x * self.keer, self.begin[1] + self.richting_y * self.keer
 
-    def botsen(self, recten, waters_pos):
+    def botsen(self, recten):
         for rect in recten:
             if Circle.circle_and_rect((self.richting_x * self.keer)+self.begin[0]+5, (self.richting_y * self.keer)+self.begin[1]+5,
                                       5, rect[0], rect[1], rect[2], rect[3]):
-                return True
-        for water in waters_pos:
-            if Circle.circle_and_rect((self.richting_x * self.keer)+self.begin[0]+5, (self.richting_y * self.keer)+self.begin[1]+5,
-                                      5, water[0], water[1], water[2], water[3]):
                 return True
 
 
@@ -301,7 +294,7 @@ def redraw():
     bal.move_andere_personen()
     bal.move()
     for x, aanval in enumerate(bal.aanvallen):
-        data = aanval.move(bal.doosjes1, bal.waters)
+        data = aanval.move(bal.doosjes1)
         if not data:
             bal.aanvallen.remove(aanval)
             del bal.aanvallen_pos[x]
