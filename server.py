@@ -28,7 +28,7 @@ class Server:
         while self.start < 2:
             time.sleep(0.02)
         c.recv(1024)
-        c.send(json.dumps([{"position": [240, 100], "foto": "self.images.stilstaan_img"}]).encode())
+        c.send(json.dumps([{"position": [240, 100], "foto": "self.images.stilstaan_img", "aanvallen": []}]).encode())
         try:
             while True:
                 andere_data = []
