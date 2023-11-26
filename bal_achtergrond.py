@@ -32,6 +32,8 @@ class Socketconnector:
 
 class Man:
     def __init__(self, tk, canvas):
+        self.lading = 3
+        self.lading_sec = 0
         self.s = None
         self.image_string = "self.images.stilstaan_img"
         self.andere_spelers = []
@@ -54,6 +56,7 @@ class Man:
         self.achtergrond_img = self.canvas.create_image(0, 0, anchor=NW, image=self.images.img)
         self.lees_in()
         self.man_img = self.canvas.create_image(self.x, self.y - 15, anchor=NW, image=self.images.stilstaan_img)
+        self.lading_balk_rood = self.canvas.create_rectangle(self.x, self.y - 15, self.x + 30, self.y - 10, fill="red")
         self.aanvallen = []
         self.aanvallen_pos = []
 
@@ -70,6 +73,7 @@ class Man:
         self.canvas.bind_all('<KeyRelease-Up>', lambda ev: self.verander_verander_y(0))
         self.canvas.bind_all('<KeyPress-Down>', lambda ev: self.verander_verander_y(3))
         self.canvas.bind_all('<KeyRelease-Down>', lambda ev: self.verander_verander_y(0))
+        self.canvas.bind_all('<Key-s>', self.aanval_naar_aanvaller)
         self.canvas.bind_all('<Button-1>', self.aanval)
 
     def move(self):
@@ -81,6 +85,12 @@ class Man:
             recten.append(plek)
         for water in  self.waters:
             waters_pos.append(self.canvas.coords(water))
+        self.lading_sec += 1
+        if self.lading_sec >= 100:
+            self.lading_sec = 0
+            if self.lading < 3:
+                self.lading += 1
+                self.canvas.coords(self.lading_balk_rood, self.x, self.y - 15, self.x + 10 * self.lading, self.y - 10)
         if self.verander_x and self.verander_y:
             self.x += self.verander_x
             self.y += self.verander_y
@@ -126,7 +136,10 @@ class Man:
                 elif self.y > 235 and self.verander_y > 0:
                     self.y -= self.verander_y
                     self.geheel_y -= self.verander_y
+        if self.lading == 3:
+            self.lading_sec = 0
         self.canvas.moveto(self.man_img, self.x, self.y)
+        self.canvas.moveto(self.lading_balk_rood, self.x, self.y - 15)
 
     def botsen(self, x, y, recten, waters_pos):
         man = (self.x + 5, self.y + 15, self.x + 19, self.y + 30)
@@ -142,7 +155,7 @@ class Man:
                 return True
 
     def bots_achtergrond(self, y):
-        if 50 > self.y > 0 > y and -125 > self.imy:
+        if (50 > self.y > 0 > y and -125 > self.imy) or (235 > self.y > 185 and self.imy > -250 and y > 0):
             self.imy -= y
             self.canvas.move(self.achtergrond_img, 0, -y)
             self.geheel_y += y
@@ -152,17 +165,8 @@ class Man:
                 self.canvas.move(rect, 0, -y)
             for water in self.waters:
                 self.canvas.move(water, 0, -y)
-        elif 235 > self.y > 185 and self.imy > -250 and y > 0:
-            self.imy -= y
-            self.canvas.move(self.achtergrond_img, 0, -y)
-            self.geheel_y += y
-            for rect in self.doosjes1:
-                self.canvas.move(rect, 0, -y)
-            for rect in self.doosjes2:
-                self.canvas.move(rect, 0, -y)
-            for water in self.waters:
-
-                self.canvas.move(water, 0, -y)
+            for aanval in self.aanvallen:
+                self.canvas.move(aanval.aanval, 0, -y)
             return True
 
     def animate(self, r):
@@ -244,8 +248,27 @@ class Man:
         self.verander_y = y
 
     def aanval(self, event):
-        self.aanvallen_pos.append((self.x, self.geheel_y))
-        self.aanvallen.append(Aanvallen(event.x-self.x, event.y-self.y, (self.x, self.y), self.canvas))
+        if self.lading:
+            self.aanvallen_pos.append((self.x, self.geheel_y))
+            self.aanvallen.append(Aanvallen(event.x-self.x, event.y-self.y, (self.x, self.y), self.canvas))
+            self.lading -= 1
+            self.canvas.coords(self.lading_balk_rood, self.x, self.y - 15, self.x + 10 * self.lading, self.y - 10)
+
+    def aanval_naar_aanvaller(self, event):
+        if self.lading:
+            persoon_max = None
+            max_afstand = 0
+            for persoon in self.andere_spelers:
+                afstand = math.sqrt(((self.x-persoon["position"][0])**2)+((self.y-(persoon["position"][1]-self.geheel_y+self.y))**2))
+                if (afstand if afstand >= 0 else -afstand) >= max_afstand:
+                    max_afstand = afstand
+                    persoon_max = persoon
+            if persoon_max:
+                self.aanvallen_pos.append((self.x, self.geheel_y))
+                self.aanvallen.append(Aanvallen(persoon_max["position"][0]+15 - self.x, (persoon_max["position"][1]-self.geheel_y+self.y)+10 - self.y, (self.x, self.y), self.canvas))
+                self.lading -= 1
+                self.canvas.coords(self.lading_balk_rood, self.x, self.y - 15, self.x + 10 * self.lading, self.y - 10)
+
 
 
 class Aanvallen:
